@@ -167,6 +167,8 @@ public class FetchRequest extends AbstractRequest {
         private List<TopicIdPartition> replaced = Collections.emptyList();
         private String rackId = "";
 
+        private int priority;
+
         public static Builder forConsumer(short maxVersion, int maxWait, int minBytes, Map<TopicPartition, PartitionData> fetchData) {
             return new Builder(ApiKeys.FETCH.oldestVersion(), maxVersion,
                 CONSUMER_REPLICA_ID,  -1, maxWait, minBytes, fetchData);
@@ -179,13 +181,21 @@ public class FetchRequest extends AbstractRequest {
 
         public Builder(short minVersion, short maxVersion, int replicaId, long replicaEpoch, int maxWait, int minBytes,
                        Map<TopicPartition, PartitionData> fetchData) {
+            this(minVersion, maxVersion, replicaId, replicaEpoch, maxWait, minBytes, fetchData, 0);
+        }
+
+        public Builder(short minVersion, short maxVersion, int replicaId, long replicaEpoch, int maxWait, int minBytes,
+                       Map<TopicPartition, PartitionData> fetchData, int priority) {
             super(ApiKeys.FETCH, minVersion, maxVersion);
             this.replicaId = replicaId;
             this.replicaEpoch = replicaEpoch;
             this.maxWait = maxWait;
             this.minBytes = minBytes;
             this.toFetch = fetchData;
+            this.priority = priority;
         }
+
+
 
         public Builder isolationLevel(IsolationLevel isolationLevel) {
             this.isolationLevel = isolationLevel;
@@ -234,6 +244,11 @@ public class FetchRequest extends AbstractRequest {
             return this;
         }
 
+        public Builder priority(int priority) {
+            this.priority = priority;
+            return this;
+        }
+
         private void addToForgottenTopicMap(List<TopicIdPartition> toForget, Map<String, FetchRequestData.ForgottenTopic> forgottenTopicMap) {
             toForget.forEach(topicIdPartition -> {
                 FetchRequestData.ForgottenTopic forgottenTopic = forgottenTopicMap.get(topicIdPartition.topic());
@@ -246,6 +261,8 @@ public class FetchRequest extends AbstractRequest {
                 forgottenTopic.partitions().add(topicIdPartition.partition());
             });
         }
+
+
 
         @Override
         public FetchRequest build(short version) {

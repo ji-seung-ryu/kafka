@@ -34,6 +34,8 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
         private final short oldestAllowedVersion;
         private final short latestAllowedVersion;
 
+        private final int priority;
+
         /**
          * Construct a new builder which allows any supported version
          */
@@ -52,9 +54,14 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
          * Construct a new builder which allows an inclusive range of versions
          */
         public Builder(ApiKeys apiKey, short oldestAllowedVersion, short latestAllowedVersion) {
+            this(apiKey, oldestAllowedVersion, latestAllowedVersion, 0);
+        }
+
+        public Builder(ApiKeys apiKey, short oldestAllowedVersion, short latestAllowedVersion, int priority) {
             this.apiKey = apiKey;
             this.oldestAllowedVersion = oldestAllowedVersion;
             this.latestAllowedVersion = latestAllowedVersion;
+            this.priority = priority;
         }
 
         public ApiKeys apiKey() {
@@ -78,12 +85,18 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
 
     private final short version;
     private final ApiKeys apiKey;
+    private final int priority;
 
     public AbstractRequest(ApiKeys apiKey, short version) {
+        this(apiKey, version, 0);
+    }
+
+    public AbstractRequest(ApiKeys apiKey, short version, int priority) {
         if (!apiKey.isVersionSupported(version))
             throw new UnsupportedVersionException("The " + apiKey + " protocol does not support version " + version);
         this.version = version;
         this.apiKey = apiKey;
+        this.priority = priority;
     }
 
     /**
@@ -97,6 +110,9 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
         return apiKey;
     }
 
+    public int priority() {
+        return priority;
+    }
     public final Send toSend(RequestHeader header) {
         return SendBuilder.buildRequestSend(header, data());
     }

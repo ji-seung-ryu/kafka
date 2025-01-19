@@ -709,7 +709,8 @@ class KafkaApis(val requestChannel: RequestChannel,
       fetchRequest.isFromFollower,
       fetchData,
       forgottenTopics,
-      topicNames)
+      topicNames,
+      fetchRequest.priority)
 
     val erroneous = mutable.ArrayBuffer[(TopicIdPartition, FetchResponseData.PartitionData)]()
     val interesting = mutable.ArrayBuffer[(TopicIdPartition, FetchRequest.PartitionData)]()
