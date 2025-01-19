@@ -835,6 +835,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
     }
 
+    // test commit
     // the callback for process a fetch response, invoked before throttling
     def processResponseCallback(responsePartitionData: Seq[(TopicIdPartition, FetchPartitionData)]): Unit = {
       val partitions = new util.LinkedHashMap[TopicIdPartition, FetchResponseData.PartitionData]
