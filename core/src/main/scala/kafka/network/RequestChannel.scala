@@ -39,6 +39,7 @@ import org.apache.kafka.common.utils.{Sanitizer, Time}
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 
 import java.util
+import java.util.Comparator
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -53,7 +54,16 @@ object RequestChannel extends Logging {
 
   def isRequestLoggingEnabled: Boolean = requestLogger.underlying.isDebugEnabled
 
-  sealed trait BaseRequest
+  sealed trait BaseRequest {
+    var priority: Int = 0
+  }
+
+  object BaseRequestComparator extends Comparator[BaseRequest] {
+    override def compare(r1: BaseRequest, r2: BaseRequest): Int = {
+      r2.priority.compareTo(r1.priority)
+    }
+  }
+
   case object ShutdownRequest extends BaseRequest
 
   case class Session(principal: KafkaPrincipal, clientAddress: InetAddress) {
@@ -75,7 +85,7 @@ object RequestChannel extends Logging {
     def apply(metricName: String): RequestMetrics = metricsMap(metricName)
 
     def close(): Unit = {
-       metricsMap.values.foreach(_.removeMetrics())
+      metricsMap.values.foreach(_.removeMetrics())
     }
   }
 
@@ -104,8 +114,8 @@ object RequestChannel extends Logging {
     // This is constructed on creation of a Request so that the JSON representation is computed before the request is
     // processed by the api layer. Otherwise, a ProduceRequest can occur without its data (ie. it goes into purgatory).
     val requestLog: Option[JsonNode] =
-      if (RequestChannel.isRequestLoggingEnabled) Some(RequestConvertToJson.request(loggableRequest))
-      else None
+    if (RequestChannel.isRequestLoggingEnabled) Some(RequestConvertToJson.request(loggableRequest))
+    else None
 
     def header: RequestHeader = context.header
 
@@ -289,6 +299,10 @@ object RequestChannel extends Logging {
       }
     }
 
+    def setPriority(priority: Int): Unit = {
+      this.priority = priority
+    }
+
     override def toString = s"Request(processor=$processor, " +
       s"connectionId=${context.connectionId}, " +
       s"session=$session, " +
@@ -350,7 +364,7 @@ class RequestChannel(val queueSize: Int,
 
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
-  private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
+  private val requestQueue = new PriorityBlockingQueue[BaseRequest](queueSize, BaseRequestComparator)
   private val processors = new ConcurrentHashMap[Int, Processor]()
   val requestQueueSizeMetricName = metricNamePrefix.concat(RequestQueueSizeMetric)
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
@@ -382,9 +396,9 @@ class RequestChannel(val queueSize: Int,
   }
 
   def closeConnection(
-    request: RequestChannel.Request,
-    errorCounts: java.util.Map[Errors, Integer]
-  ): Unit = {
+                       request: RequestChannel.Request,
+                       errorCounts: java.util.Map[Errors, Integer]
+                     ): Unit = {
     // This case is used when the request handler has encountered an error, but the client
     // does not expect a response (e.g. when produce request has acks set to 0)
     updateErrorMetrics(request.header.apiKey, errorCounts.asScala)
@@ -392,10 +406,10 @@ class RequestChannel(val queueSize: Int,
   }
 
   def sendResponse(
-    request: RequestChannel.Request,
-    response: AbstractResponse,
-    onComplete: Option[Send => Unit]
-  ): Unit = {
+                    request: RequestChannel.Request,
+                    response: AbstractResponse,
+                    onComplete: Option[Send => Unit]
+                  ): Unit = {
     updateErrorMetrics(request.header.apiKey, response.errorCounts.asScala)
     sendResponse(new RequestChannel.SendResponse(
       request,
@@ -534,10 +548,10 @@ class RequestMetrics(name: String) {
   // Temporary memory allocated for processing request (only populated for fetch and produce requests)
   // This shows the memory allocated for compression/conversions excluding the actual request size
   val tempMemoryBytesHist =
-    if (name == ApiKeys.FETCH.name || name == ApiKeys.PRODUCE.name)
-      Some(metricsGroup.newHistogram(TemporaryMemoryBytes, true, tags))
-    else
-      None
+  if (name == ApiKeys.FETCH.name || name == ApiKeys.PRODUCE.name)
+    Some(metricsGroup.newHistogram(TemporaryMemoryBytes, true, tags))
+  else
+    None
 
   private val errorMeters = mutable.Map[Errors, ErrorMeter]()
   Errors.values.foreach(error => errorMeters.put(error, new ErrorMeter(name, error)))
@@ -563,7 +577,7 @@ class RequestMetrics(name: String) {
       else {
         synchronized {
           if (meter == null)
-             meter = metricsGroup.newMeter(ErrorsPerSec, "requests", TimeUnit.SECONDS, tags)
+            meter = metricsGroup.newMeter(ErrorsPerSec, "requests", TimeUnit.SECONDS, tags)
           meter
         }
       }
