@@ -250,7 +250,14 @@ public class ConsumerConfig extends AbstractConfig {
     public static final String AUTO_INCLUDE_JMX_REPORTER_CONFIG = CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG;
 
     /**
-     * <code>check.crcs</code>
+     * <code>priority</code>
+     */
+    public static final String PRIORITY_CONFIG = "priority";
+
+    public static final String PRIORITY_DOC = "The priority of the consumer. The broker will use the priority to determine the order in which to serve requests. Higher priority consumers will receive messages from the broker before lower priority consumers. If two consumers have the same priority, then the broker will serve them in the order that they connected to the broker. The default priority is 0.";
+
+    public static final int DEFAULT_PRIORITY = 0;
+    /**
      */
     public static final String CHECK_CRCS_CONFIG = "check.crcs";
     private static final String CHECK_CRCS_DOC = "Automatically check the CRC32 of the records consumed. This ensures no on-the-wire or on-disk corruption to the messages occurred. This check adds some overhead, so it may be disabled in cases seeking extreme performance.";
@@ -344,6 +351,7 @@ public class ConsumerConfig extends AbstractConfig {
     private static final String SECURITY_PROVIDERS_DOC = SecurityConfig.SECURITY_PROVIDERS_DOC;
 
     private static final AtomicInteger CONSUMER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
+
 
     static {
         CONFIG = new ConfigDef().define(BOOTSTRAP_SERVERS_CONFIG,
@@ -581,12 +589,12 @@ public class ConsumerConfig extends AbstractConfig {
                                         DEFAULT_ALLOW_AUTO_CREATE_TOPICS,
                                         Importance.MEDIUM,
                                         ALLOW_AUTO_CREATE_TOPICS_DOC)
-                                // security support
                                 .define(SECURITY_PROVIDERS_CONFIG,
                                         Type.STRING,
                                         null,
                                         Importance.LOW,
-                                        SECURITY_PROVIDERS_DOC)
+                                       SECURITY_PROVIDERS_DOC)
+                .define(PRIORITY_CONFIG, Type.INT, DEFAULT_PRIORITY, Importance.MEDIUM, PRIORITY_DOC)
                                 .define(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG,
                                         Type.STRING,
                                         CommonClientConfigs.DEFAULT_SECURITY_PROTOCOL,

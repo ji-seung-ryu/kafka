@@ -54,16 +54,7 @@ object RequestChannel extends Logging {
 
   def isRequestLoggingEnabled: Boolean = requestLogger.underlying.isDebugEnabled
 
-  sealed trait BaseRequest {
-    var priority: Int = 0
-  }
-
-  object BaseRequestComparator extends Comparator[BaseRequest] {
-    override def compare(r1: BaseRequest, r2: BaseRequest): Int = {
-      r2.priority.compareTo(r1.priority)
-    }
-  }
-
+  sealed trait BaseRequest
   case object ShutdownRequest extends BaseRequest
 
   case class Session(principal: KafkaPrincipal, clientAddress: InetAddress) {
@@ -298,11 +289,6 @@ object RequestChannel extends Logging {
           }
       }
     }
-
-    def setPriority(priority: Int): Unit = {
-      this.priority = priority
-    }
-
     override def toString = s"Request(processor=$processor, " +
       s"connectionId=${context.connectionId}, " +
       s"session=$session, " +
@@ -364,7 +350,45 @@ class RequestChannel(val queueSize: Int,
 
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
-  private val requestQueue = new PriorityBlockingQueue[BaseRequest](queueSize, BaseRequestComparator)
+  private val requestComparator: Comparator[BaseRequest] = new Comparator[BaseRequest] {
+    override def compare(o1: BaseRequest, o2: BaseRequest): Int = {
+      (o1, o2) match {
+        // ShutdownRequest has the highest priority
+        case (ShutdownRequest, _) => -1
+        case (_, ShutdownRequest) => 1
+
+        // Compare FETCH requests based on priority in their body
+        case (req1: Request, req2: Request) if req1.header.apiKey == ApiKeys.FETCH && req2.header.apiKey == ApiKeys.FETCH =>
+          val fetchPriority1 = extractFetchPriority(req1)
+          val fetchPriority2 = extractFetchPriority(req2)
+          Integer.compare(fetchPriority1, fetchPriority2)
+
+        // FETCH requests are prioritized over any other type of request
+        case (req1: Request, req2: Request) if req1.header.apiKey == ApiKeys.FETCH => -1
+        case (req1: Request, req2: Request) if req2.header.apiKey == ApiKeys.FETCH => 1
+
+        // Default case for other requests
+        case _ => 0
+      }
+    }
+
+
+    /**
+     * Extracts the priority for a FETCH request from its body.
+     * This method should be implemented to parse the body and return a priority value.
+     * For now, let's assume it's a field in the FetchRequest object.
+     */
+    private def extractFetchPriority(request: Request): Int = {
+      try {
+        val fetchRequest = request.body[FetchRequest]
+        fetchRequest.priority // Replace `priority` with the actual field or logic
+      } catch {
+        case _: Exception => Integer.MAX_VALUE // Default low priority if parsing fails
+      }
+    }
+  }
+
+  private val requestQueue = new PriorityBlockingQueue[BaseRequest](queueSize, requestComparator)
   private val processors = new ConcurrentHashMap[Int, Processor]()
   val requestQueueSizeMetricName = metricNamePrefix.concat(RequestQueueSizeMetric)
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
@@ -618,3 +642,4 @@ class RequestMetrics(name: String) {
     errorMeters.clear()
   }
 }
+

@@ -588,6 +588,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
     private final ConsumerNetworkClient client;
     private final SubscriptionState subscriptions;
     private final ConsumerMetadata metadata;
+
+    private final int priority;
     private final long retryBackoffMs;
     private final long requestTimeoutMs;
     private final int defaultApiTimeoutMs;
@@ -700,6 +702,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
             });
 
             log.debug("Initializing the Kafka consumer");
+            this.priority = config.getInt(ConsumerConfig.PRIORITY_CONFIG);
             this.requestTimeoutMs = config.getInt(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG);
             this.defaultApiTimeoutMs = config.getInt(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG);
             this.time = Time.SYSTEM;
@@ -879,6 +882,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
         this.assignors = assignors;
         this.groupId = Optional.ofNullable(groupId);
         this.kafkaConsumerMetrics = new KafkaConsumerMetrics(metrics, "consumer");
+        this.priority = 0;
     }
 
     private static Metrics buildMetrics(ConsumerConfig config, Time time, String clientId) {
