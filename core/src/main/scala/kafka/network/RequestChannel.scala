@@ -363,10 +363,6 @@ class RequestChannel(val queueSize: Int,
           val fetchPriority2 = extractFetchPriority(req2)
           Integer.compare(fetchPriority1, fetchPriority2)
 
-        // FETCH requests are prioritized over any other type of request
-        case (req1: Request, req2: Request) if req1.header.apiKey == ApiKeys.FETCH => -1
-        case (req1: Request, req2: Request) if req2.header.apiKey == ApiKeys.FETCH => 1
-
         // Default case for other requests
         case _ => 0
       }
