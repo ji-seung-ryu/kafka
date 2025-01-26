@@ -241,7 +241,8 @@ public abstract class AbstractFetch<K, V> implements Closeable {
                 .metadata(requestData.metadata())
                 .removed(requestData.toForget())
                 .replaced(requestData.toReplace())
-                .rackId(fetchConfig.clientRackId);
+                .rackId(fetchConfig.clientRackId)
+                .priority(fetchConfig.priority);
 
         log.debug("Sending {} {} to broker {}", fetchConfig.isolationLevel, requestData, fetchTarget);
 

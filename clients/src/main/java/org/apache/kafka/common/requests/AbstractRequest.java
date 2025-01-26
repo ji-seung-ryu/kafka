@@ -54,7 +54,7 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
          * Construct a new builder which allows an inclusive range of versions
          */
         public Builder(ApiKeys apiKey, short oldestAllowedVersion, short latestAllowedVersion) {
-            this(apiKey, oldestAllowedVersion, latestAllowedVersion, 0);
+            this(apiKey, oldestAllowedVersion, latestAllowedVersion, -1);
         }
 
         public Builder(ApiKeys apiKey, short oldestAllowedVersion, short latestAllowedVersion, int priority) {
@@ -88,7 +88,7 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
     private final int priority;
 
     public AbstractRequest(ApiKeys apiKey, short version) {
-        this(apiKey, version, 0);
+        this(apiKey, version, -2);
     }
 
     public AbstractRequest(ApiKeys apiKey, short version, int priority) {

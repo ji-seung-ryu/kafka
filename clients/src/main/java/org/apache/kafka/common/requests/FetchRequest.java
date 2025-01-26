@@ -181,7 +181,7 @@ public class FetchRequest extends AbstractRequest {
 
         public Builder(short minVersion, short maxVersion, int replicaId, long replicaEpoch, int maxWait, int minBytes,
                        Map<TopicPartition, PartitionData> fetchData) {
-            this(minVersion, maxVersion, replicaId, replicaEpoch, maxWait, minBytes, fetchData, 0);
+            this(minVersion, maxVersion, replicaId, replicaEpoch, maxWait, minBytes, fetchData, -1);
         }
 
         public Builder(short minVersion, short maxVersion, int replicaId, long replicaEpoch, int maxWait, int minBytes,
@@ -327,6 +327,7 @@ public class FetchRequest extends AbstractRequest {
                 fetchRequestData.setSessionEpoch(metadata.epoch());
                 fetchRequestData.setSessionId(metadata.sessionId());
             }
+            fetchRequestData.setPriority(priority);
             fetchRequestData.setRackId(rackId);
 
             return new FetchRequest(fetchRequestData, version);
@@ -356,7 +357,7 @@ public class FetchRequest extends AbstractRequest {
     }
 
     public FetchRequest(FetchRequestData fetchRequestData, short version) {
-        super(ApiKeys.FETCH, version);
+        super(ApiKeys.FETCH, version, fetchRequestData.priority());
         this.data = fetchRequestData;
         this.metadata = new FetchMetadata(fetchRequestData.sessionId(), fetchRequestData.sessionEpoch());
     }
@@ -519,6 +520,8 @@ public class FetchRequest extends AbstractRequest {
             }
         }
     }
+
+
 
     @Override
     public FetchRequestData data() {

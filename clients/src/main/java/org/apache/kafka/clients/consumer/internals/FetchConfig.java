@@ -65,6 +65,8 @@ public class FetchConfig<K, V> {
     final int fetchSize;
     final int maxPollRecords;
     final boolean checkCrcs;
+
+    final int priority;
     final String clientRackId;
     final Deserializer<K> keyDeserializer;
     final Deserializer<V> valueDeserializer;
@@ -90,6 +92,7 @@ public class FetchConfig<K, V> {
         this.keyDeserializer = Objects.requireNonNull(keyDeserializer, "Message key deserializer provided to FetchConfig should not be null");
         this.valueDeserializer = Objects.requireNonNull(valueDeserializer, "Message value deserializer provided to FetchConfig should not be null");
         this.isolationLevel = isolationLevel;
+        this.priority = 0;
     }
 
     public FetchConfig(ConsumerConfig config,
@@ -106,6 +109,7 @@ public class FetchConfig<K, V> {
         this.keyDeserializer = Objects.requireNonNull(keyDeserializer, "Message key deserializer provided to FetchConfig should not be null");
         this.valueDeserializer = Objects.requireNonNull(valueDeserializer, "Message value deserializer provided to FetchConfig should not be null");
         this.isolationLevel = isolationLevel;
+        this.priority = config.getInt(ConsumerConfig.PRIORITY_CONFIG);
     }
 
     @Override
