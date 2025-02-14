@@ -113,13 +113,13 @@ class KafkaRequestHandlerPool(val brokerId: Int,
                               logAndThreadNamePrefix : String) extends Logging {
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
-  private val threadPoolSize: AtomicInteger = new AtomicInteger(numThreads)
+  private val threadPoolSize: AtomicInteger = new AtomicInteger(1)
   /* a meter to track the average free capacity of the request handlers */
   private val aggregateIdleMeter = metricsGroup.newMeter(requestHandlerAvgIdleMetricName, "percent", TimeUnit.NANOSECONDS)
 
   this.logIdent = "[" + logAndThreadNamePrefix + " Kafka Request Handler on Broker " + brokerId + "], "
-  val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](numThreads)
-  for (i <- 0 until numThreads) {
+  val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](1)
+  for (i <- 0 until 1) {
     createHandler(i)
   }
 

@@ -490,6 +490,7 @@ class RequestChannel(val queueSize: Int,
 
   // Method to retrieve requests in a round-robin manner
   def receiveRequest(timeout: Long): BaseRequest = {
+    Thread.sleep(100L)
     if (lastFetchedFromFetchQueue) {
       // If the last request was from fetchQueue, try getting from requestQueue
       val req = requestQueue.poll(timeout, TimeUnit.MILLISECONDS)
@@ -502,6 +503,7 @@ class RequestChannel(val queueSize: Int,
     // Try fetching from fetchQueue first, unless the last request was from it
     val fetchReq = fetchQueue.poll(timeout, TimeUnit.MILLISECONDS)
     if (fetchReq != null) {
+      println("fetch priority : " + fetchReq.body[FetchRequest].priority())
       lastFetchedFromFetchQueue = true
       return fetchReq
     }
