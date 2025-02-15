@@ -350,24 +350,12 @@ class RequestChannel(val queueSize: Int,
 
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
-  private val requestComparator: Comparator[BaseRequest] = new Comparator[BaseRequest] {
-    override def compare(o1: BaseRequest, o2: BaseRequest): Int = {
-      (o1, o2) match {
-        // ShutdownRequest has the highest priority
-        case (ShutdownRequest, _) => -1
-        case (_, ShutdownRequest) => 1
-
-        // Compare FETCH requests based on priority in their body
-        case (req1: Request, req2: Request) if req1.header.apiKey == ApiKeys.FETCH && req2.header.apiKey == ApiKeys.FETCH =>
-          val fetchPriority1 = extractFetchPriority(req1)
-          val fetchPriority2 = extractFetchPriority(req2)
-          Integer.compare(fetchPriority1, fetchPriority2)
-
-        // Default case for other requests
-        case _ => 0
-      }
+  private val fetchComparator: Comparator[Request] = new Comparator[Request] {
+    override def compare(req1: Request, req2: Request): Int = {
+      val fetchPriority1 = extractFetchPriority(req1)
+      val fetchPriority2 = extractFetchPriority(req2)
+      Integer.compare(fetchPriority1, fetchPriority2)
     }
-
 
     /**
      * Extracts the priority for a FETCH request from its body.
@@ -384,7 +372,8 @@ class RequestChannel(val queueSize: Int,
     }
   }
 
-  private val requestQueue = new PriorityBlockingQueue[BaseRequest](queueSize, requestComparator)
+  private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
+  private val fetchQueue = new PriorityBlockingQueue[Request](queueSize, fetchComparator)
   private val processors = new ConcurrentHashMap[Int, Processor]()
   val requestQueueSizeMetricName = metricNamePrefix.concat(RequestQueueSizeMetric)
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
@@ -412,7 +401,12 @@ class RequestChannel(val queueSize: Int,
 
   /** Send a request to be handled, potentially blocking until there is room in the queue for the request */
   def sendRequest(request: RequestChannel.Request): Unit = {
-    requestQueue.put(request)
+    request match {
+      case req: Request if req.header.apiKey == ApiKeys.FETCH =>
+        fetchQueue.put(req) // FETCH 요청은 fetchQueue로 이동
+      case _ =>
+        requestQueue.put(request) // 그 외 요청은 일반 FIFO 큐로 이동
+    }
   }
 
   def closeConnection(
@@ -491,8 +485,30 @@ class RequestChannel(val queueSize: Int,
   }
 
   /** Get the next request or block until specified time has elapsed */
-  def receiveRequest(timeout: Long): RequestChannel.BaseRequest =
+  // State variable to track the last queue that was used
+  @volatile private var lastFetchedFromFetchQueue = false
+
+  // Method to retrieve requests in a round-robin manner
+  def receiveRequest(timeout: Long): BaseRequest = {
+    if (lastFetchedFromFetchQueue) {
+      // If the last request was from fetchQueue, try getting from requestQueue
+      val req = requestQueue.poll(timeout, TimeUnit.MILLISECONDS)
+      if (req != null) {
+        lastFetchedFromFetchQueue = false
+        return req
+      }
+    }
+
+    // Try fetching from fetchQueue first, unless the last request was from it
+    val fetchReq = fetchQueue.poll(timeout, TimeUnit.MILLISECONDS)
+    if (fetchReq != null) {
+      lastFetchedFromFetchQueue = true
+      return fetchReq
+    }
+
+    // If fetchQueue is empty, fallback to requestQueue
     requestQueue.poll(timeout, TimeUnit.MILLISECONDS)
+  }
 
   /** Get the next request or block until there is one */
   def receiveRequest(): RequestChannel.BaseRequest =
