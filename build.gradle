@@ -918,6 +918,7 @@ project(':core') {
   if (userEnableTestCoverage) {
     scoverage {
       scoverageVersion = versions.scoverage
+
       reportDir = file("${rootProject.buildDir}/scoverage")
       highlighting = false
       minimumRate = 0.0
@@ -1284,6 +1285,9 @@ project(':examples') {
   dependencies {
     implementation project(':clients')
     implementation project(':server-common')
+    implementation 'org.apache.kafka:kafka-clients:3.6.0'
+    implementation 'org.knowm.xchart:xchart:3.8.1'
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
   }
 
   javadoc {
@@ -1338,6 +1342,7 @@ project(':clients') {
     testRuntimeOnly libs.jacksonJDK8Datatypes
 
     generator project(':generator')
+
   }
 
   task createVersionFile() {

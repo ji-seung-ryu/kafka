@@ -39,7 +39,6 @@ import org.apache.kafka.common.utils.{Sanitizer, Time}
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 
 import java.util
-import java.util.Comparator
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -350,30 +349,8 @@ class RequestChannel(val queueSize: Int,
 
   private val metricsGroup = new KafkaMetricsGroup(this.getClass)
 
-  private val fetchComparator: Comparator[Request] = new Comparator[Request] {
-    override def compare(req1: Request, req2: Request): Int = {
-      val fetchPriority1 = extractFetchPriority(req1)
-      val fetchPriority2 = extractFetchPriority(req2)
-      Integer.compare(fetchPriority1, fetchPriority2)
-    }
-
-    /**
-     * Extracts the priority for a FETCH request from its body.
-     * This method should be implemented to parse the body and return a priority value.
-     * For now, let's assume it's a field in the FetchRequest object.
-     */
-    private def extractFetchPriority(request: Request): Int = {
-      try {
-        val fetchRequest = request.body[FetchRequest]
-        fetchRequest.priority // Replace `priority` with the actual field or logic
-      } catch {
-        case _: Exception => Integer.MAX_VALUE // Default low priority if parsing fails
-      }
-    }
-  }
-
   private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
-  private val fetchQueue = new PriorityBlockingQueue[Request](queueSize, fetchComparator)
+  private val fetchQueue = new ArrayBlockingQueue[Request](queueSize)
   private val processors = new ConcurrentHashMap[Int, Processor]()
   val requestQueueSizeMetricName = metricNamePrefix.concat(RequestQueueSizeMetric)
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
@@ -490,7 +467,11 @@ class RequestChannel(val queueSize: Int,
 
   // Method to retrieve requests in a round-robin manner
   def receiveRequest(timeout: Long): BaseRequest = {
-    Thread.sleep(100L)
+    Thread.sleep(300L)
+    val MAX_WAIT_TIME_MS = 2000
+    val LOW_PRIORITY = 3
+    val now = System.currentTimeMillis()
+
     if (lastFetchedFromFetchQueue) {
       // If the last request was from fetchQueue, try getting from requestQueue
       val req = requestQueue.poll(timeout, TimeUnit.MILLISECONDS)
@@ -503,9 +484,16 @@ class RequestChannel(val queueSize: Int,
     // Try fetching from fetchQueue first, unless the last request was from it
     val fetchReq = fetchQueue.poll(timeout, TimeUnit.MILLISECONDS)
     if (fetchReq != null) {
-      println("fetch priority : " + fetchReq.body[FetchRequest].priority())
-      lastFetchedFromFetchQueue = true
-      return fetchReq
+      val priority = fetchReq.body[FetchRequest].priority()
+      val requestAge = now - fetchReq.startTimeNanos / 1_000_000
+      if (priority > LOW_PRIORITY && requestAge < MAX_WAIT_TIME_MS) {
+        fetchQueue.offer(fetchReq)
+        Thread.sleep(100L)
+      } else {
+        println("fetch priority : " + priority)
+        lastFetchedFromFetchQueue = true
+        return fetchReq
+      }
     }
 
     // If fetchQueue is empty, fallback to requestQueue
@@ -656,5 +644,3 @@ class RequestMetrics(name: String) {
     errorMeters.clear()
   }
 }
-
-
