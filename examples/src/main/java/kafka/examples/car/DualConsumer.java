@@ -95,13 +95,8 @@ public class DualConsumer {
         try {
             while (true) {
                 long now = System.currentTimeMillis();
-                ConsumerRecords<String, String> records;
-                if (topic == SENSOR_TOPIC){
-                    records = consumer.poll(Duration.ofMillis(100));
-                }
-                else {
-                    records = consumer.poll(Duration.ofMillis(1000));
-                }
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
 
                 if (!records.isEmpty()) {
                     processRecords(records, processingTimes, timestampList, now, type);

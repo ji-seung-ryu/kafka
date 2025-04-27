@@ -467,7 +467,6 @@ class RequestChannel(val queueSize: Int,
 
   // Method to retrieve requests in a round-robin manner
   def receiveRequest(timeout: Long): BaseRequest = {
-    Thread.sleep(300L)
     val MAX_WAIT_TIME_MS = 2000
     val LOW_PRIORITY = 3
     val now = System.nanoTime()
@@ -494,7 +493,6 @@ class RequestChannel(val queueSize: Int,
         println(fetchReq.startTimeNanos)
         println(requestAge)
 
-        Thread.sleep(100L)
       } else {
         println("fetch priority : " + priority)
         lastFetchedFromFetchQueue = true
