@@ -18,21 +18,30 @@ public class DualConsumer {
     private static final String BOOTSTRAP_SERVERS = "localhost:9092";
 
     private static List<Long> sensorProcessingTimes = new CopyOnWriteArrayList<>();
-    private static List<Long> logProcessingTimes =new CopyOnWriteArrayList<>();
-    private static List<Long> timestampList =new CopyOnWriteArrayList<>();
+    private static List<Long> logProcessingTimes = new CopyOnWriteArrayList<>();
+    private static List<Long> sensorTimestampList = new CopyOnWriteArrayList<>();
+    private static List<Long> logTimestampList = new CopyOnWriteArrayList<>();
+
 
     private static XYChart chart;
     private static SwingWrapper<XYChart> sw;
 
     public static void main(String[] args) {
         ExecutorService executor = Executors.newFixedThreadPool(2);
+        Properties props = new Properties();
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "60000");         // 60초
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "15000");
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "600000");     // 10분
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "600000");
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+
 
         // XChart 설정 (그래프)
         setupChart();
 
         // Kafka Consumer 실행 (각 Consumer를 별도 스레드에서 실행)
-        executor.execute(() -> startConsumer(SENSOR_TOPIC, "sensor_group", sensorProcessingTimes, "Sensor"));
-        executor.execute(() -> startConsumer(LOG_TOPIC, "log_group", logProcessingTimes, "Log"));
+        executor.execute(() -> startConsumer(SENSOR_TOPIC, "sensor_group", sensorProcessingTimes, sensorTimestampList, "Sensor"));
+        executor.execute(() -> startConsumer(LOG_TOPIC, "log_group", logProcessingTimes, logTimestampList, "Log"));
 
         // 안전한 종료 처리
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -62,38 +71,53 @@ public class DualConsumer {
         chart.addSeries("Sensor Processing Time", xInit, yInit);
         chart.addSeries("Log Processing Time", xInit, yInit);
 
+        // ✅ 여기 추가
+        chart.getSeriesMap().get("Sensor Processing Time")
+                .setXYSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Scatter);
+        chart.getSeriesMap().get("Log Processing Time")
+                .setXYSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Scatter);
+
         sw = new SwingWrapper<>(chart);
         sw.displayChart();
     }
 
-    private static void startConsumer(String topic, String groupId, List<Long> processingTimes, String type) {
+    private static void startConsumer(String topic, String groupId, List<Long> processingTimes,
+                                      List<Long> timestampList, String type) {
         Properties props = createConsumerProperties(groupId);
         Consumer<String, String> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(topic));
 
         System.out.println("[Dual Consumer] " + type + " Consumer started...");
 
+        long lastLogProcessTime = System.currentTimeMillis();
+        final long logProcessInterval = 10_000; // 10초
+
         try {
             while (true) {
-                long startTime = System.currentTimeMillis();
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-
-                processRecords(records, processingTimes, startTime, type);
-                updateGraph();
-
-                if (groupId.equals("sensor_group")) {
-                    Thread.sleep(50); // 50ms 간격으로 데이터 컨슘 (실시간)
-                } else {
-                    Thread.sleep(10000); // 10초 간격으로 로그 데이터 컨슘
+                long now = System.currentTimeMillis();
+                ConsumerRecords<String, String> records;
+                if (topic == SENSOR_TOPIC){
+                    records = consumer.poll(Duration.ofMillis(100));
                 }
+                else {
+                    records = consumer.poll(Duration.ofMillis(1000));
+                }
+
+                if (!records.isEmpty()) {
+                    processRecords(records, processingTimes, timestampList, now, type);
+                    updateGraph();
+                }
+
             }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Thread.currentThread().interrupt();
         } finally {
             consumer.close();
             System.out.println("[Dual Consumer] " + type + " Consumer stopped.");
         }
     }
+
 
     private static Properties createConsumerProperties(String groupId) {
         Properties props = new Properties();
@@ -111,43 +135,55 @@ public class DualConsumer {
         return props;
     }
 
-    private static void processRecords(ConsumerRecords<String, String> records, List<Long> processingTimes, long startTime, String type) {
-        for (ConsumerRecord<String, String> record : records) {
-            long processingTime = System.currentTimeMillis() - startTime;
-            System.out.println("✅ [" + type + " Consumer] Processing: " + record.value());
-            System.out.println("✅ [" + type + " Consumer] Processing Time: " + processingTime + "ms\n");
+    private static void processRecords(ConsumerRecords<String, String> records, List<Long> processingTimes,
+                                       List<Long> timestampList, long startTime, String type) {
 
-            processingTimes.add(processingTime);
-            timestampList.add(System.currentTimeMillis()); // 🚀 X축 데이터 추가
+        long processingTime = System.currentTimeMillis() - startTime;
 
-            if (processingTimes.size() > 100) {
-                processingTimes.remove(0);
-                timestampList.remove(0); // 🛠 X축 데이터도 함께 정리
-            }
-        }
+        processingTimes.add(processingTime);
+        timestampList.add(System.currentTimeMillis());
+
+//        for (ConsumerRecord<String, String> record : records) {
+//            long processingTime = System.currentTimeMillis() - startTime;
+//            System.out.println("✅ [" + type + " Consumer] Processing: " + record.value());
+//            System.out.println("✅ [" + type + " Consumer] Processing Time: " + processingTime + "ms\n");
+//
+//            processingTimes.add(processingTime);
+//            timestampList.add(System.currentTimeMillis());
+//
+//            if (processingTimes.size() > 100) {
+//                processingTimes.remove(0);
+//                timestampList.remove(0);
+//            }
+//        }
     }
 
     private static void updateGraph() {
-        if (timestampList.isEmpty()) {
-            return; // 🚨 X축 데이터가 없으면 실행 안 함
-        }
+        List<Long> safeSensorTimestamps = new ArrayList<>(sensorTimestampList);  // ✅ 전체 복사
+        List<Long> safeSensorProcessingTimes = new ArrayList<>(sensorProcessingTimes);
+        List<Long> safeLogTimestamps = new ArrayList<>(logTimestampList);
+        List<Long> safeLogProcessingTimes = new ArrayList<>(logProcessingTimes);
 
-        int minSize = Math.min(timestampList.size(), Math.min(sensorProcessingTimes.size(), logProcessingTimes.size()));
+        int sensorSize = Math.min(safeSensorProcessingTimes.size(), safeSensorTimestamps.size());
+        int logSize = Math.min(safeLogProcessingTimes.size(), safeLogTimestamps.size());
 
-        if (minSize < 1) {
-            return; // 🚨 최소한 하나 이상의 데이터가 있어야 실행
-        }
+        if (sensorSize < 1 && logSize < 1) return;
 
-        int fromIndex = Math.max(0, minSize - 1000); // 🚀 100보다 작은 경우도 처리 가능하도록 변경
+        int sensorFrom = Math.max(0, sensorSize - 100);
+        int logFrom = Math.max(0, logSize - 100);
 
-        List<Long> xData = timestampList.subList(fromIndex, minSize);
-        List<Long> sensorData = sensorProcessingTimes.subList(fromIndex, minSize);
-        List<Long> logData = logProcessingTimes.subList(fromIndex, minSize);
+        // ✅ 복사본에서 subList 뽑기
+        List<Long> sensorX = safeSensorTimestamps.subList(sensorFrom, sensorSize);
+        List<Long> sensorY = safeSensorProcessingTimes.subList(sensorFrom, sensorSize);
+        List<Long> logX = safeLogTimestamps.subList(logFrom, logSize);
+        List<Long> logY = safeLogProcessingTimes.subList(logFrom, logSize);
 
-        chart.updateXYSeries("Sensor Processing Time", xData, sensorData, null);
-        chart.updateXYSeries("Log Processing Time", xData, logData, null);
+        chart.updateXYSeries("Sensor Processing Time", sensorX, sensorY, null);
+        chart.updateXYSeries("Log Processing Time", logX, logY, null);
         sw.repaintChart();
     }
+
+
 
     private static void printProcessingTimeStats(List<Long> processingTimes, String type) {
         if (processingTimes.isEmpty()) {

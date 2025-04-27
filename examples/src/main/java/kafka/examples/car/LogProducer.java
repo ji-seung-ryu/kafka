@@ -36,7 +36,7 @@ public class LogProducer {
                 System.out.println("[Log Producer] Sending: " + message);
                 producer.send(new ProducerRecord<>(TOPIC, String.valueOf(vehicleId), message));
 
-                Thread.sleep(1000); // 1초 간격으로 로그 데이터 전송
+                Thread.sleep(10000); // 10초 간격으로 로그 데이터 전송
             }
         } catch (InterruptedException e) {
             e.printStackTrace();

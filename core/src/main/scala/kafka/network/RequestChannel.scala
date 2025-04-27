@@ -470,7 +470,7 @@ class RequestChannel(val queueSize: Int,
     Thread.sleep(300L)
     val MAX_WAIT_TIME_MS = 2000
     val LOW_PRIORITY = 3
-    val now = System.currentTimeMillis()
+    val now = System.nanoTime()
 
     if (lastFetchedFromFetchQueue) {
       // If the last request was from fetchQueue, try getting from requestQueue
@@ -485,9 +485,15 @@ class RequestChannel(val queueSize: Int,
     val fetchReq = fetchQueue.poll(timeout, TimeUnit.MILLISECONDS)
     if (fetchReq != null) {
       val priority = fetchReq.body[FetchRequest].priority()
-      val requestAge = now - fetchReq.startTimeNanos / 1_000_000
+      val requestAge = (now - fetchReq.startTimeNanos) / 1_000_000
+      println("get fetch priority : " + priority)
       if (priority > LOW_PRIORITY && requestAge < MAX_WAIT_TIME_MS) {
         fetchQueue.offer(fetchReq)
+        println("add again in the queue.")
+        println(now)
+        println(fetchReq.startTimeNanos)
+        println(requestAge)
+
         Thread.sleep(100L)
       } else {
         println("fetch priority : " + priority)
