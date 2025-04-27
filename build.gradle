@@ -1284,6 +1284,9 @@ project(':examples') {
   dependencies {
     implementation project(':clients')
     implementation project(':server-common')
+    implementation 'org.apache.kafka:kafka-clients:3.6.0'
+    implementation 'org.knowm.xchart:xchart:3.8.1'
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
   }
 
   javadoc {
