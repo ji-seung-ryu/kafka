@@ -792,18 +792,15 @@ public class SharePartitionManagerTest {
         SharePartition sp0 = mock(SharePartition.class);
         SharePartition sp1 = mock(SharePartition.class);
         SharePartition sp2 = mock(SharePartition.class);
-        SharePartition sp3 = mock(SharePartition.class);
 
         when(sp0.releaseAcquiredRecords(ArgumentMatchers.eq(String.valueOf(memberId1)))).thenReturn(CompletableFuture.completedFuture(null));
         when(sp1.releaseAcquiredRecords(ArgumentMatchers.eq(String.valueOf(memberId1)))).thenReturn(CompletableFuture.completedFuture(null));
         when(sp2.releaseAcquiredRecords(ArgumentMatchers.eq(String.valueOf(memberId1)))).thenReturn(CompletableFuture.completedFuture(null));
-        when(sp3.releaseAcquiredRecords(ArgumentMatchers.eq(String.valueOf(memberId1)))).thenReturn(CompletableFuture.completedFuture(null));
 
         SharePartitionCache partitionCache = new SharePartitionCache();
         partitionCache.put(new SharePartitionKey(groupId, tp0), sp0);
         partitionCache.put(new SharePartitionKey(groupId, tp1), sp1);
         partitionCache.put(new SharePartitionKey(groupId, tp2), sp2);
-        partitionCache.put(new SharePartitionKey(groupId, tp3), sp3);
 
         sharePartitionManager = SharePartitionManagerBuilder.builder()
                 .withCache(cache)
@@ -1077,31 +1074,31 @@ public class SharePartitionManagerTest {
             assertEquals(4, sp1.nextFetchOffset());
             assertEquals(10, sp2.nextFetchOffset());
             assertEquals(20, sp3.nextFetchOffset());
-            return buildLogReadResultWithFakeRecords(topicIdPartitions);
+            return buildLogReadResult(topicIdPartitions);
         }).doAnswer(invocation -> {
             assertEquals(15, sp0.nextFetchOffset());
             assertEquals(1, sp1.nextFetchOffset());
             assertEquals(25, sp2.nextFetchOffset());
             assertEquals(15, sp3.nextFetchOffset());
-            return buildLogReadResultWithFakeRecords(topicIdPartitions);
+            return buildLogReadResult(topicIdPartitions);
         }).doAnswer(invocation -> {
             assertEquals(6, sp0.nextFetchOffset());
             assertEquals(18, sp1.nextFetchOffset());
             assertEquals(26, sp2.nextFetchOffset());
             assertEquals(23, sp3.nextFetchOffset());
-            return buildLogReadResultWithFakeRecords(topicIdPartitions);
+            return buildLogReadResult(topicIdPartitions);
         }).doAnswer(invocation -> {
             assertEquals(30, sp0.nextFetchOffset());
             assertEquals(5, sp1.nextFetchOffset());
             assertEquals(26, sp2.nextFetchOffset());
             assertEquals(16, sp3.nextFetchOffset());
-            return buildLogReadResultWithFakeRecords(topicIdPartitions);
+            return buildLogReadResult(topicIdPartitions);
         }).doAnswer(invocation -> {
             assertEquals(25, sp0.nextFetchOffset());
             assertEquals(5, sp1.nextFetchOffset());
             assertEquals(26, sp2.nextFetchOffset());
             assertEquals(16, sp3.nextFetchOffset());
-            return buildLogReadResultWithFakeRecords(topicIdPartitions);
+            return buildLogReadResult(topicIdPartitions);
         }).when(mockReplicaManager).readFromLog(any(), any(), any(ReplicaQuota.class), anyBoolean());
 
         int threadCount = 100;
@@ -1743,9 +1740,7 @@ public class SharePartitionManagerTest {
         // Since acquisition lock for sp1 and sp2 cannot be acquired, we should have 2 watched keys.
         assertEquals(2, delayedShareFetchPurgatory.watched());
 
-        doAnswer(invocation -> buildLogReadResult(List.of(tp1)))
-                .when(mockReplicaManager)
-                .readFromLog(any(), any(), any(ReplicaQuota.class), anyBoolean());
+        doAnswer(invocation -> buildLogReadResult(List.of(tp1))).when(mockReplicaManager).readFromLog(any(), any(), any(ReplicaQuota.class), anyBoolean());
 
         Map<TopicIdPartition, List<ShareAcknowledgementBatch>> acknowledgeTopics = new HashMap<>();
         acknowledgeTopics.put(tp1, List.of(
@@ -3167,7 +3162,7 @@ public class SharePartitionManagerTest {
     static Seq<Tuple2<TopicIdPartition, LogReadResult>> buildLogReadResult(List<TopicIdPartition> topicIdPartitions) {
         List<Tuple2<TopicIdPartition, LogReadResult>> logReadResults = new ArrayList<>();
         topicIdPartitions.forEach(topicIdPartition -> logReadResults.add(new Tuple2<>(topicIdPartition, new LogReadResult(
-            new FetchDataInfo(new LogOffsetMetadata(0, 0, 0), MemoryRecords.EMPTY),
+            new FetchDataInfo(new LogOffsetMetadata(0, 0, 0), MemoryRecords.withRecords(Compression.NONE, new SimpleRecord("test-key".getBytes(), "test-value".getBytes()))),
             Option.empty(),
             -1L,
             -1L,
@@ -3180,27 +3175,6 @@ public class SharePartitionManagerTest {
         ))));
         return CollectionConverters.asScala(logReadResults).toSeq();
     }
-    static Seq<Tuple2<TopicIdPartition, LogReadResult>> buildLogReadResultWithFakeRecords(List<TopicIdPartition> topicIdPartitions) {
-        List<Tuple2<TopicIdPartition, LogReadResult>> logReadResults = new ArrayList<>();
-        for (TopicIdPartition topicIdPartition : topicIdPartitions) {
-            MemoryRecords records = MemoryRecords.withRecords(
-                    Compression.NONE,
-                    new SimpleRecord("test-key".getBytes(), "test-value".getBytes())
-            );
-
-            LogReadResult logReadResult = new LogReadResult(
-                    new FetchDataInfo(new LogOffsetMetadata(0, 0, 0), records),
-                    Option.empty(),
-                    -1L, -1L, -1L, -1L, -1L,
-                    Option.empty(), Option.empty(), Option.empty()
-            );
-
-            logReadResults.add(new Tuple2<>(topicIdPartition, logReadResult));
-        }
-
-        return CollectionConverters.asScala(logReadResults).toSeq();
-    }
-
     static void mockReplicaManagerDelayedShareFetch(ReplicaManager replicaManager,
                                                     DelayedOperationPurgatory<DelayedShareFetch> delayedShareFetchPurgatory) {
         doAnswer(invocationOnMock -> {
