@@ -3162,7 +3162,8 @@ public class SharePartitionManagerTest {
     static Seq<Tuple2<TopicIdPartition, LogReadResult>> buildLogReadResult(List<TopicIdPartition> topicIdPartitions) {
         List<Tuple2<TopicIdPartition, LogReadResult>> logReadResults = new ArrayList<>();
         topicIdPartitions.forEach(topicIdPartition -> logReadResults.add(new Tuple2<>(topicIdPartition, new LogReadResult(
-            new FetchDataInfo(new LogOffsetMetadata(0, 0, 0), MemoryRecords.withRecords(Compression.NONE, new SimpleRecord("test-key".getBytes(), "test-value".getBytes()))),
+            new FetchDataInfo(new LogOffsetMetadata(0, 0, 0), MemoryRecords.withRecords(
+                    Compression.NONE, new SimpleRecord("test-key".getBytes(), "test-value".getBytes()))),
             Option.empty(),
             -1L,
             -1L,
