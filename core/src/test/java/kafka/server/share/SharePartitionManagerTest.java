@@ -1884,6 +1884,7 @@ public class SharePartitionManagerTest {
 
         SharePartition sp1 = mock(SharePartition.class);
         SharePartition sp2 = mock(SharePartition.class);
+        SharePartition sp3 = mock(SharePartition.class);
 
         ShareSessionCache cache = mock(ShareSessionCache.class);
         ShareSession shareSession = mock(ShareSession.class);
@@ -1898,10 +1899,12 @@ public class SharePartitionManagerTest {
             when(sp2.canAcquireRecords()).thenReturn(true);
             return CompletableFuture.completedFuture(Optional.empty());
         }).when(sp2).releaseAcquiredRecords(ArgumentMatchers.eq(memberId));
+        when(sp3.releaseAcquiredRecords(ArgumentMatchers.eq(memberId))).thenReturn(CompletableFuture.completedFuture(null));
 
         SharePartitionCache partitionCache = new SharePartitionCache();
         partitionCache.put(new SharePartitionKey(groupId, tp1), sp1);
         partitionCache.put(new SharePartitionKey(groupId, tp2), sp2);
+        partitionCache.put(new SharePartitionKey(groupId, tp3), sp3);
 
         ShareFetch shareFetch = new ShareFetch(
             FETCH_PARAMS,
