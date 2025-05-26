@@ -3179,6 +3179,7 @@ public class SharePartitionManagerTest {
         ))));
         return CollectionConverters.asScala(logReadResults).toSeq();
     }
+
     static void mockReplicaManagerDelayedShareFetch(ReplicaManager replicaManager,
                                                     DelayedOperationPurgatory<DelayedShareFetch> delayedShareFetchPurgatory) {
         doAnswer(invocationOnMock -> {
