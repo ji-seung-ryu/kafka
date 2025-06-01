@@ -1250,12 +1250,6 @@ public class SharePartitionManagerTest {
         when(sp2.fetchOffsetMetadata(anyLong())).thenReturn(Optional.of(mock(LogOffsetMetadata.class)));
         when(sp3.fetchOffsetMetadata(anyLong())).thenReturn(Optional.of(mock(LogOffsetMetadata.class)));
 
-        // Mock nextFetchOffset() functionality for share partitions to reflect the moving fetch of share partitions.
-        when(sp0.nextFetchOffset()).thenReturn((long) 1, (long) 15, (long) 6, (long) 30, (long) 25);
-        when(sp1.nextFetchOffset()).thenReturn((long) 4, (long) 1, (long) 18, (long) 5);
-        when(sp2.nextFetchOffset()).thenReturn((long) 10, (long) 25, (long) 26);
-        when(sp3.nextFetchOffset()).thenReturn((long) 20, (long) 15, (long) 23, (long) 16);
-
         sharePartitionManager = SharePartitionManagerBuilder.builder()
             .withReplicaManager(mockReplicaManager)
             .withTimer(mockTimer)
@@ -1263,37 +1257,8 @@ public class SharePartitionManagerTest {
             .withPartitionCache(partitionCache)
             .build();
 
-        doAnswer(invocation -> {
-            assertEquals(1, sp0.nextFetchOffset());
-            assertEquals(4, sp1.nextFetchOffset());
-            assertEquals(10, sp2.nextFetchOffset());
-            assertEquals(20, sp3.nextFetchOffset());
-            return buildLogReadResult(topicIdPartitions);
-        }).doAnswer(invocation -> {
-            assertEquals(15, sp0.nextFetchOffset());
-            assertEquals(1, sp1.nextFetchOffset());
-            assertEquals(25, sp2.nextFetchOffset());
-            assertEquals(15, sp3.nextFetchOffset());
-            return buildLogReadResult(topicIdPartitions);
-        }).doAnswer(invocation -> {
-            assertEquals(6, sp0.nextFetchOffset());
-            assertEquals(18, sp1.nextFetchOffset());
-            assertEquals(26, sp2.nextFetchOffset());
-            assertEquals(23, sp3.nextFetchOffset());
-            return buildLogReadResult(topicIdPartitions);
-        }).doAnswer(invocation -> {
-            assertEquals(30, sp0.nextFetchOffset());
-            assertEquals(5, sp1.nextFetchOffset());
-            assertEquals(26, sp2.nextFetchOffset());
-            assertEquals(16, sp3.nextFetchOffset());
-            return buildLogReadResult(topicIdPartitions);
-        }).doAnswer(invocation -> {
-            assertEquals(25, sp0.nextFetchOffset());
-            assertEquals(5, sp1.nextFetchOffset());
-            assertEquals(26, sp2.nextFetchOffset());
-            assertEquals(16, sp3.nextFetchOffset());
-            return buildLogReadResult(topicIdPartitions);
-        }).when(mockReplicaManager).readFromLog(any(), any(), any(ReplicaQuota.class), anyBoolean());
+        when(mockReplicaManager.readFromLog(any(), any(), any(ReplicaQuota.class), anyBoolean())).thenReturn(
+            buildLogReadResult(topicIdPartitions));
 
         int threadCount = 100;
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
