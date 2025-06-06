@@ -1,10 +1,6 @@
-Producer (KafkaProducer)
+## ▶️ How to Run
 
-SensorProducer.java → 차량 센서 데이터를 토픽 topic_sensor로 보냄 (우선순위 높음)
-LogProducer.java → 차량 로그 데이터를 토픽 topic_log로 보냄 (우선순위 낮음)
-Consumer (KafkaConsumer)
-
-SensorConsumer.java → topic_sensor에서 데이터를 읽고 실시간 처리 (즉시 반응 필요, 20ms 이내)
-LogConsumer.java → topic_log에서 데이터를 읽고 저장 (로그 기록 목적)
-
-DualConsumer.java → topic_sensor와 topic_log에서 데이터를 읽고 처리 및 실행시간 비교 (실시간 처리와 로그 기록을 동시에 수행)
+1. Clone this repository and checkout the `3.5-threshold` branch.
+2. Start Kafka and ZooKeeper services.
+3. Run `SensorProducer.java` and `LogProducer.java` to publish data.
+4. Run `DualConsumer.java` to observe processing latency with graphs.
