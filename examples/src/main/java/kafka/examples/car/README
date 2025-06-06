@@ -1,5 +1,3 @@
-## ▶️ How to Run
-
 1. Clone this repository and checkout the `3.5-threshold` branch.
 2. Start Kafka and ZooKeeper services.
 3. Run `SensorProducer.java` and `LogProducer.java` to publish data.
